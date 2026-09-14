@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="CS 180 Project 1: channel alignment of the Prokudin-Gorskii collection, with single-scale search, image pyramids, and restoration experiments.">
+<title>CS 180 · Project 1 · Images of the Russian Empire</title>
+<link rel="stylesheet" href="style.css">
+<script src="script.js" defer></script>
+</head>
+<body>
+<a href="#main" class="skip">Skip to report</a>
+<div class="topbar"><div class="wrap"><span>CS 180 · Fall 2026</span><a href="https://cal-cs180.github.io/fa26/hw/proj1/index.html">Project 1 / assignment</a></div></div>
+<header class="hero wrap">
+  <div><p class="eyebrow">Image alignment</p>
+  <h1>Images of the<br>Russian Empire</h1>
+  <p class="intro">Reconstructing color from the three exposures in a Prokudin-Gorskii glass negative.</p>
+  <p class="meta">14 course images · 3 additional negatives<br>Single-scale search, image pyramids, and five processing experiments</p></div>
+  <figure><img src="assets/emir-final.jpg" alt="The Emir of Bukhara, reconstructed with edge alignment, cropping, and contrast adjustment"><figcaption><span>Emir of Bukhara</span><span>Edge alignment + crop + contrast</span></figcaption></figure>
+</header>
+<nav class="navigation" aria-label="Report sections"><div class="wrap">
+<a href="#overview">01 / The input</a><a href="#single">02 / Single scale</a><a href="#pyramid">03 / Image pyramid</a><a href="#additional">04 / Other negatives</a><a href="#extras">05 / Experiments</a><a href="#notes">06 / Notes</a>
+</div></nav>
+<main class="wrap" id="main">
+
+<section id="overview"><div class="section-head"><span class="section-number">01</span><div>
+<h2>Three exposures, slightly apart</h2>
+<div class="prose"><p>Prokudin-Gorskii recorded a scene through blue, green, and red filters. Each scan contains three grayscale exposures stacked vertically, in that order. Assigning them directly to RGB produces colored outlines wherever the exposures disagree.</p>
+<p>The alignment model here is just translation: keep B fixed and find separate horizontal and vertical shifts for G and R. This cannot account for a person moving between exposures, but it is enough to align much of the static scene.</p></div>
+<div class="strip">
+<figure class="channel b"><img src="assets/channel-blue.jpg" alt="Cathedral blue-filter exposure"><figcaption>Top of scan → blue</figcaption></figure>
+<figure class="channel g"><img src="assets/channel-green.jpg" alt="Cathedral green-filter exposure"><figcaption>Middle of scan → green</figcaption></figure>
+<figure class="channel r"><img src="assets/channel-red.jpg" alt="Cathedral red-filter exposure"><figcaption>Bottom of scan → red</figcaption></figure>
+</div>
+<div class="prose"><p>The height is divided by three with integer division; at most two leftover rows at the bottom are discarded. JPEG and TIFF inputs are converted to floating-point values in [0, 1] using their original integer type. This matters because these TIFF scans are 16-bit, while the JPEGs are 8-bit.</p></div>
+</div></div></section>
+
+<section id="single"><div class="section-head"><span class="section-number">02</span><div>
+<h2>A small search window</h2>
+<div class="prose"><p>For the three small JPEGs, each channel is shifted by every integer displacement in [−15, 15] along both axes: 961 candidates per channel. The best candidate maximizes mean-subtracted normalized cross-correlation (NCC).</p>
+<div class="equation">NCC(A, B) = Σ[(A − mean(A))(B − mean(B))]<br>　　　　　 / √[Σ(A − mean(A))² · Σ(B − mean(B))²]</div>
+<p>NCC compares the spatial pattern after removing the mean and normalizing the magnitude. A simple brightness offset or positive gain therefore does not change the score. The implementation also supports L2 by minimizing squared differences, but all baseline results on this page use NCC.</p>
+<p>The outer 12% of each image is excluded from scoring because the scanned borders can dominate the match. For each search window, the reference patch is further restricted so every candidate uses the same number of valid pixels. No wrapped pixels enter the score.</p>
+<p>After alignment, the shifted R and G channels are stacked with B. The output is cropped to the intersection of valid pixels. This removes the wraparound from <code>np.roll</code>; it does not yet detect the photographic border.</p></div>
+<div class="columns"><figure><a href="assets/cathedral-unaligned.jpg"><img src="assets/cathedral-unaligned.jpg" alt="Cathedral: Cathedral: directly stacked, before alignment."></a><figcaption>Cathedral: directly stacked, before alignment.</figcaption></figure><figure><a href="assets/cathedral-single.jpg"><img src="assets/cathedral-single.jpg" alt="Cathedral: Cathedral: single-scale NCC alignment."></a><figcaption>Cathedral: single-scale NCC alignment.</figcaption></figure></div>
+<div class="table-wrap"><table><thead><tr><th>Input</th><th>Channel size (w × h)</th><th>G → B (x, y)</th><th>R → B (x, y)</th><th>Seconds</th></tr></thead><tbody><tr><td>cathedral.jpg</td><td>390 × 341</td><td>(2, 5)</td><td>(3, 12)</td><td>0.32</td></tr><tr><td>monastery.jpg</td><td>391 × 341</td><td>(2, -3)</td><td>(2, 3)</td><td>0.36</td></tr><tr><td>tobolsk.jpg</td><td>396 × 341</td><td>(3, 3)</td><td>(3, 6)</td><td>0.39</td></tr></tbody></table></div>
+<div class="result-grid"><figure>
+<a href="assets/monastery-single.jpg"><img src="assets/monastery-single.jpg" alt="Monastery, single alignment"></a>
+<figcaption><strong>Monastery</strong>
+<span class="offsets">G (2, -3) · R (2, 3) · 0.36 s</span>
+<span class="caption-note"></span></figcaption></figure>
+<figure>
+<a href="assets/tobolsk-single.jpg"><img src="assets/tobolsk-single.jpg" alt="Tobolsk, single alignment"></a>
+<figcaption><strong>Tobolsk</strong>
+<span class="offsets">G (3, 3) · R (3, 6) · 0.39 s</span>
+<span class="caption-note"></span></figcaption></figure></div>
+<p class="small">All offsets on this page are (x, y), measured in original-resolution pixels. Positive x shifts right; positive y shifts down. G and R are both aligned to B.</p>
+</div></div></section>
+
+<section id="pyramid"><div class="section-head"><span class="section-number">03</span><div>
+<h2>Searching from coarse to fine</h2>
+<div class="prose"><p>A ±15-pixel search is too small for the full-resolution scans. Enlarging it at full resolution would require comparing millions of pixels at thousands of positions. The pyramid finds the large motion on a small image, then only searches nearby positions at the next scale.</p>
+<ol class="steps"><li>Blur each channel with the separable kernel [1, 4, 6, 4, 1] / 16, then keep every other row and column.</li><li>Repeat until the longest side is at most 320 pixels.</li><li>At the smallest level, search ±15 pixels in each direction.</li><li>Double the estimated displacement when moving to the next larger level, then search ±2 pixels around it.</li><li>Continue through the original image resolution and compose RGB using the final offsets.</li></ol>
+<p>The blur and pyramid are built explicitly; there is no automatic alignment or built-in pyramid function. The same settings are used for every image. Below is the actual displacement history for <em>Melons</em>, starting at the smallest level.</p></div>
+<div class="table-wrap"><table><thead><tr><th>Level</th><th>Size (w × h)</th><th>G → B (x, y)</th><th>R → B (x, y)</th></tr></thead><tbody><tr><td>4</td><td>236 × 203</td><td>(1, 5)</td><td>(1, 11)</td></tr><tr><td>3</td><td>472 × 406</td><td>(1, 10)</td><td>(2, 22)</td></tr><tr><td>2</td><td>943 × 811</td><td>(3, 21)</td><td>(3, 45)</td></tr><tr><td>1</td><td>1885 × 1621</td><td>(5, 41)</td><td>(7, 89)</td></tr><tr><td>0</td><td>3770 × 3241</td><td>(10, 81)</td><td>(13, 178)</td></tr></tbody></table></div>
+<div class="prose"><p>The baseline alignment took 0.12–1.66 seconds per image on an Apple Silicon Mac. The 16-bit scans averaged 1.55 seconds. These timers include building the pyramids and aligning both channels, but exclude loading and saving. The complete run, including both methods, all processing experiments, and JPEG output, took 67.2 seconds.</p>
+<p>The following gallery contains <strong>all 14 required raw-pixel NCC results</strong>, before optional color adjustments. Emir is a clear failure: its red exposure is shifted far from the correct position. Its edge-based result appears in the experiments section. The other images have no similarly large displacement failure in visual inspection, though fine color fringes, motion, and damaged plate edges remain.</p></div>
+<div class="result-grid"><figure>
+<a href="assets/cathedral-pyramid.jpg"><img src="assets/cathedral-pyramid.jpg" alt="Cathedral, pyramid alignment"></a>
+<figcaption><strong>Cathedral</strong>
+<span class="offsets">G (2, 5) · R (3, 12) · 0.14 s</span>
+<span class="caption-note"></span></figcaption></figure>
+<figure>
+<a href="assets/church-pyramid.jpg"><img src="assets/church-pyramid.jpg" alt="Church, pyramid alignment"></a>
+<figcaption><strong>Church</strong>
+<span class="offsets">G (4, 25) · R (-4, 58) · 1.47 s</span>
+<span class="caption-note"></span></figcaption></figure>
+<figure>
+<a href="assets/emir-pyramid.jpg"><img src="assets/emir-pyramid.jpg" alt="Emir, pyramid alignment"></a>
+<figcaption><strong>Emir</strong>
+<span class="offsets">G (24, 49) · R (-203, 139) · 1.48 s</span>
+<span class="caption-note">Raw-pixel NCC failure. The bright blue robe has very different intensity in the red exposure.</span></figcaption></figure>
+<figure>
+<a href="assets/harvesters-pyramid.jpg"><img src="assets/harvesters-pyramid.jpg" alt="Harvesters, pyramid alignment"></a>
+<figcaption><strong>Harvesters</strong>
+<span class="offsets">G (17, 60) · R (13, 124) · 1.54 s</span>
+<span class="caption-note"></span></figcaption></figure>
+<figure>
+<a href="assets/icon-pyramid.jpg"><img src="assets/icon-pyramid.jpg" alt="Icon, pyramid alignment"></a>
+<figcaption><strong>Icon</strong>
+<span class="offsets">G (17, 41) · R (23, 89) · 1.55 s</span>
+<span class="caption-note"></span></figcaption></figure>
+<figure>
+<a href="assets/ilemselga-pyramid.jpg"><img src="assets/ilemselga-pyramid.jpg" alt="Ilemselga, pyramid alignment"></a>
+<figcaption><strong>Ilemselga</strong>
+<span class="offsets">G (7, 40) · R (11, 130) · 1.54 s</span>
+<span class="caption-note"></span></figcaption></figure>
+<figure>
+<a href="assets/melons-pyramid.jpg"><img src="assets/melons-pyramid.jpg" alt="Melons, pyramid alignment"></a>
+<figcaption><strong>Melons</strong>
+<span class="offsets">G (10, 81) · R (13, 178) · 1.58 s</span>
+<span class="caption-note"></span></figcaption></figure>
+<figure>
+<a href="assets/monastery-pyramid.jpg"><img src="assets/monastery-pyramid.jpg" alt="Monastery, pyramid alignment"></a>
+<figcaption><strong>Monastery</strong>
+<span class="offsets">G (2, -3) · R (2, 3) · 0.12 s</span>
+<span class="caption-note"></span></figcaption></figure>
+<figure>
+<a href="assets/religous_painting-pyramid.jpg"><img src="assets/religous_painting-pyramid.jpg" alt="Religious painting, pyramid alignment"></a>
+<figcaption><strong>Religious painting</strong>
+<span class="offsets">G (3, 27) · R (7, 68) · 1.51 s</span>
+<span class="caption-note">Input filename is religous_painting.tif; the original spelling is retained in the offset download.</span></figcaption></figure>
+<figure>
+<a href="assets/self_portrait-pyramid.jpg"><img src="assets/self_portrait-pyramid.jpg" alt="Self-portrait, pyramid alignment"></a>
+<figcaption><strong>Self-portrait</strong>
+<span class="offsets">G (29, 79) · R (37, 176) · 1.58 s</span>
+<span class="caption-note"></span></figcaption></figure>
+<figure>
+<a href="assets/siren-pyramid.jpg"><img src="assets/siren-pyramid.jpg" alt="Siren (lilacs), pyramid alignment"></a>
+<figcaption><strong>Siren (lilacs)</strong>
+<span class="offsets">G (-6, 49) · R (-25, 96) · 1.66 s</span>
+<span class="caption-note"></span></figcaption></figure>
+<figure>
+<a href="assets/three_generations-pyramid.jpg"><img src="assets/three_generations-pyramid.jpg" alt="Three generations, pyramid alignment"></a>
+<figcaption><strong>Three generations</strong>
+<span class="offsets">G (14, 53) · R (11, 111) · 1.54 s</span>
+<span class="caption-note"></span></figcaption></figure>
+<figure>
+<a href="assets/tobolsk-pyramid.jpg"><img src="assets/tobolsk-pyramid.jpg" alt="Tobolsk, pyramid alignment"></a>
+<figcaption><strong>Tobolsk</strong>
+<span class="offsets">G (3, 3) · R (3, 6) · 0.15 s</span>
+<span class="caption-note"></span></figcaption></figure>
+<figure>
+<a href="assets/wharf-pyramid.jpg"><img src="assets/wharf-pyramid.jpg" alt="Wharf, pyramid alignment"></a>
+<figcaption><strong>Wharf</strong>
+<span class="offsets">G (-7, 15) · R (-16, 82) · 1.62 s</span>
+<span class="caption-note"></span></figcaption></figure></div>
+<p class="small"><a href="offsets.csv">Download all measured offsets and alignment times (CSV)</a>. Gallery images are resized for the web; estimation and the saved local outputs use the original resolution.</p>
+</div></div></section>
+
+<section id="additional"><div class="section-head"><span class="section-number">04</span><div>
+<h2>Three additional negatives</h2>
+<div class="prose"><p>These are full-resolution, 16-bit, three-frame glass negatives downloaded from the Library of Congress. They were processed with the same NCC pyramid and settings as the course images. The inputs are the original separations, not the library's existing color composites.</p>
+<p>Saimaa provides trees and reflections, Tiflis has many small buildings, and Borodino has a distant church against a large area of sky and grass. The reconstructed structures appear aligned in all three. Stains near the top of the Borodino negative remain because alignment does not repair damaged image content.</p></div>
+<div class="result-grid"><figure>
+<a href="assets/saimaa-pyramid.jpg"><img src="assets/saimaa-pyramid.jpg" alt="On Saimaa Lake, pyramid alignment"></a>
+<figcaption><strong>On Saimaa Lake</strong>
+<span class="offsets">G (-23, 48) · R (-45, 165) · 1.55 s</span>
+<span class="caption-note"> <a href="https://www.loc.gov/pictures/item/2018679084/">Library of Congress · LC-DIG-prok-01655</a></span></figcaption></figure>
+<figure>
+<a href="assets/tiflis-pyramid.jpg"><img src="assets/tiflis-pyramid.jpg" alt="Western part of Tiflis, pyramid alignment"></a>
+<figcaption><strong>Western part of Tiflis</strong>
+<span class="offsets">G (29, 41) · R (46, 92) · 1.56 s</span>
+<span class="caption-note"> <a href="https://www.loc.gov/pictures/item/2018679885/">Library of Congress · LC-DIG-prok-01677</a></span></figcaption></figure>
+<figure>
+<a href="assets/borodino-pyramid.jpg"><img src="assets/borodino-pyramid.jpg" alt="General view of Borodino&#x27;s church, pyramid alignment"></a>
+<figcaption><strong>General view of Borodino&#x27;s church</strong>
+<span class="offsets">G (4, 34) · R (1, 96) · 1.54 s</span>
+<span class="caption-note"> <a href="https://www.loc.gov/pictures/item/2018679984/">Library of Congress · LC-DIG-prok-00377</a></span></figcaption></figure></div>
+<div class="table-wrap"><table><thead><tr><th>Input</th><th>Channel size (w × h)</th><th>G → B (x, y)</th><th>R → B (x, y)</th><th>Seconds</th></tr></thead><tbody><tr><td>saimaa.tif</td><td>3778 × 3233</td><td>(-23, 48)</td><td>(-45, 165)</td><td>1.55</td></tr><tr><td>tiflis.tif</td><td>3741 × 3254</td><td>(29, 41)</td><td>(46, 92)</td><td>1.56</td></tr><tr><td>borodino.tif</td><td>3809 × 3257</td><td>(4, 34)</td><td>(1, 96)</td><td>1.54</td></tr></tbody></table></div>
+</div></div></section>
+
+<section id="extras"><div class="section-head"><span class="section-number">05</span><div>
+<h2>What improves, and what does not</h2>
+<p class="prose">These experiments are separate from the required baseline. The final display recipe uses edge alignment, detected cropping, and a shared contrast stretch. White balance and color mapping are shown separately because they can change colors in ways the scene does not justify.</p>
+
+<div class="experiment"><h3>1. Align edges instead of brightness</h3>
+<div class="prose"><p>Emir's robe is bright in one exposure and much darker in another. Mean subtraction and normalization cannot fix a change that depends on the object's color. Raw-pixel NCC places R at (-203, 139); the result has two heads and displaced patterns.</p>
+<p>At each pyramid level, central differences estimate horizontal and vertical derivatives. NCC is then computed on the gradient magnitude √(I<sub>x</sub>² + I<sub>y</sub>²). This emphasizes the locations of boundaries, which are more consistent across channels. The search itself is unchanged.</p>
+<p>For Emir, the edge result is G (24, 49), R (40, 107). The head, robe and door frame come into alignment. The comparison uses the same rectangle in B's coordinates, with no contrast or color changes.</p></div>
+<div class="compare"><div class="compare-images"><img src="assets/emir-edges-detail.jpg" alt="Emir detail after edge alignment"><img class="before" src="assets/emir-pyramid-detail.jpg" alt="Same Emir detail with failed raw-pixel NCC alignment"></div><div class="compare-labels"><span>Raw-pixel NCC</span><span>Edge NCC</span></div><label for="emir-slider">Drag to compare the same region</label><input id="emir-slider" type="range" min="0" max="100" value="50"></div>
+<div class="columns print-comparison"><figure><img src="assets/emir-pyramid-detail.jpg" alt="Failed pixel alignment detail"><figcaption>Raw-pixel NCC</figcaption></figure><figure><img src="assets/emir-edges-detail.jpg" alt="Improved edge alignment detail"><figcaption>NCC on gradient magnitudes</figcaption></figure></div>
+<p class="small">The website has a comparison slider. This PDF shows both images side by side.</p>
+</div>
+
+<div class="experiment"><h3>2. Detect the border</h3>
+<div class="prose"><p>Removing the common-overlap boundary is not enough: it leaves the original white and dark frame, plus strips where channels disagree. The cropping experiment marks very dark pixels, almost-white pixels, and strong channel fringes. Row and column profiles measure how much of each scan line looks like a border.</p>
+<p>A median filter smooths those profiles. Starting near each outside edge, the detector follows runs with more than 55% marked pixels and crops through the run, with a small safety margin. It searches only the outer 15% of each side. Crop positions come from the image, rather than from one fixed rectangle.</p>
+<p>For Tiflis, the valid overlap is 3695 × 3162; the detected rectangle is (left, top, right, bottom) = (144, 32, 3552, 3048). Thin residual fringes and isolated stains can survive because this is a row/column heuristic. It can also mistake a very dark scene edge for a border.</p></div>
+<div class="columns"><figure><a href="assets/tiflis-edges.jpg"><img src="assets/tiflis-edges.jpg" alt="Western part of Tiflis: Before: aligned common overlap, including the scanned frame."></a><figcaption>Before: aligned common overlap, including the scanned frame.</figcaption></figure><figure><a href="assets/tiflis-crop.jpg"><img src="assets/tiflis-crop.jpg" alt="Western part of Tiflis: After: frame detected and cropped. No color adjustment."></a><figcaption>After: frame detected and cropped. No color adjustment.</figcaption></figure></div>
+</div>
+
+<div class="experiment"><h3>3. Stretch the contrast</h3>
+<div class="prose"><p>The 1st and 99th percentiles of all three channels provide one shared black and white point. Values between them are linearly remapped to [0, 1], and the tails are clipped. The percentiles are estimated from every fourth row and column to reduce the cost.</p>
+<div class="equation">output = clip((input − p₁) / (p₉₉ − p₁), 0, 1)</div>
+<p>For Tiflis, the endpoints are 0.145 and 0.968. This gives the distant city more contrast, but some bright sky loses detail. One mapping is shared by R, G and B; stretching channels independently would also change the color balance.</p></div>
+<div class="columns"><figure><a href="assets/tiflis-crop.jpg"><img src="assets/tiflis-crop.jpg" alt="Western part of Tiflis: Before: cropped RGB."></a><figcaption>Before: cropped RGB.</figcaption></figure><figure><a href="assets/tiflis-contrast.jpg"><img src="assets/tiflis-contrast.jpg" alt="Western part of Tiflis: After: shared 1–99% contrast stretch."></a><figcaption>After: shared 1–99% contrast stretch.</figcaption></figure></div>
+</div>
+
+<div class="experiment"><h3>4. Try gray-world white balance</h3>
+<div class="prose"><p>Gray-world estimates the illuminant by assuming the average scene color is neutral. The mean of each channel is measured over pixels whose average brightness is between 0.1 and 0.9. Each channel is multiplied by the overall mean divided by its own mean; gains are limited to [0.7, 1.4].</p>
+<p>On Borodino, the RGB gains are (1.016, 0.901, 1.104). The large area of green grass biases the average. Reducing green and increasing blue makes the sky more purple. This is a useful failure case: the method cannot distinguish a green landscape from green illumination. It is therefore not part of the shared final display recipe.</p></div>
+<div class="columns"><figure><a href="assets/borodino-crop.jpg"><img src="assets/borodino-crop.jpg" alt="General view of Borodino&#x27;s church: Before: edge alignment and cropping."></a><figcaption>Before: edge alignment and cropping.</figcaption></figure><figure><a href="assets/borodino-white_balance.jpg"><img src="assets/borodino-white_balance.jpg" alt="General view of Borodino&#x27;s church: After: gray-world adjustment; the sky picks up a purple cast."></a><figcaption>After: gray-world adjustment; the sky picks up a purple cast.</figcaption></figure></div>
+</div>
+
+<div class="experiment"><h3>5. A modest color-mapping experiment</h3>
+<div class="prose"><p>The original filter sensitivities are unknown, so assigning the exposures directly to display RGB is only an approximation. As a small experiment, each RGB vector is mixed 15% toward its luminance. This is a fixed 3 × 3 transform equivalent to reducing saturation.</p>
+<div class="equation">Y = 0.2126R + 0.7152G + 0.0722B<br>RGB′ = 0.85 RGB + 0.15 (Y, Y, Y)</div>
+<p>On the lilacs, the change softens the strongest violet and blue colors. It does not estimate the historical camera's spectral response, and there is no color target here that could establish accuracy. The comparison is an aesthetic adjustment, not evidence of recovered true color.</p></div>
+<div class="columns"><figure><a href="assets/siren-crop.jpg"><img src="assets/siren-crop.jpg" alt="Siren (lilacs): Before: direct RGB assignment, after alignment and cropping."></a><figcaption>Before: direct RGB assignment, after alignment and cropping.</figcaption></figure><figure><a href="assets/siren-color_mapping.jpg"><img src="assets/siren-color_mapping.jpg" alt="Siren (lilacs): After: the same image with the fixed luminance-mixing transform."></a><figcaption>After: the same image with the fixed luminance-mixing transform.</figcaption></figure></div>
+</div>
+</div></div></section>
+
+<section id="notes"><div class="section-head"><span class="section-number">06</span><div>
+<h2>Remaining limitations</h2>
+<div class="prose"><p>There is one clear large alignment failure in the raw-pixel gallery: Emir. Edge matching resolves it, but all the results still use a single integer translation per channel. Moving water, foliage and people can leave local colored contours even when the architecture is aligned.</p>
+<p>The cropping routine removes much of the scanned frame but leaves some narrow colored strips and damaged areas. Contrast can exaggerate the remaining plate defects. Neither gray-world nor the saturation mapping is a calibrated restoration of the original scene colors.</p>
+<p>All reported offsets and timings come from one complete run with fixed settings. Alignment was also checked on synthetic images with known shifts, including opposite directions, brightness changes and odd-sized pyramid levels. Visual inspection of the photographs is not a ground-truth accuracy measurement.</p></div>
+<h3>Sources</h3>
+<ul class="source-list">
+<li><a href="https://cal-cs180.github.io/fa26/hw/proj1/index.html">CS 180 Project 1 assignment and provided data</a>.</li>
+<li><a href="https://www.loc.gov/collections/prokudin-gorskii/">Prokudin-Gorskii photograph collection</a>, Library of Congress, Prints and Photographs Division.</li>
+<li><a href="https://www.loc.gov/pictures/item/2018679084/">On Saimaa Lake</a> — negative LC-DIG-prok-01655. <a href="https://tile.loc.gov/storage-services/master/pnp/prok/01600/01655a.tif">16-bit source TIFF</a>.</li><li><a href="https://www.loc.gov/pictures/item/2018679885/">Western part of Tiflis</a> — negative LC-DIG-prok-01677. <a href="https://tile.loc.gov/storage-services/master/pnp/prok/01600/01677a.tif">16-bit source TIFF</a>.</li><li><a href="https://www.loc.gov/pictures/item/2018679984/">General view of Borodino&#x27;s church</a> — negative LC-DIG-prok-00377. <a href="https://tile.loc.gov/storage-services/master/pnp/prok/00300/00377a.tif">16-bit source TIFF</a>.</li>
+</ul>
+</div></div></section>
+</main>
+<footer class="footer wrap"><p>CS 180 · Project 1 · Fall 2026</p><p>Photographs: Sergei Mikhailovich Prokudin-Gorskii / Library of Congress. Display images are JPEG previews of the computed results.</p><p class="public-url">Report URL: <span id="report-url"><a href="https://manic-cui.github.io/cs180-project1/">https://manic-cui.github.io/cs180-project1/</a></span></p></footer>
+</body></html>
