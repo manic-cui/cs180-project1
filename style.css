@@ -93,6 +93,7 @@ td:not(:first-child) { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; 
  .section-number { display:none; }
  .columns { grid-template-columns:1fr 1fr; gap:5mm; }
  .result-grid { grid-template-columns:1fr 1fr; gap:5mm; margin:5mm 0; }
+ #additional .result-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
  .result-grid img { height:57mm; aspect-ratio:auto; }
  .result-grid figure { break-inside:avoid; }
  .result-grid figcaption { font-size:7pt; margin-top:2mm; }
