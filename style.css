@@ -4,7 +4,7 @@ html { scroll-behavior:smooth; scroll-padding-top:76px; }
 body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
 a { color:var(--accent); text-underline-offset:4px; }
 a:hover { color:#142f2d; }
-a:focus-visible, button:focus-visible, input:focus-visible { outline:3px solid #bf7237; outline-offset:4px; }
+a:focus-visible { outline:3px solid #bf7237; outline-offset:4px; }
 .skip { position:absolute; top:-60px; left:20px; }
 .skip:focus { top:12px; z-index:10; background:white; padding:10px; }
 .wrap { width:min(1140px,calc(100% - 64px)); margin:auto; }
@@ -23,7 +23,7 @@ p { margin:0 0 18px; }
 figure { margin:0; }
 img { display:block; width:100%; height:auto; }
 figcaption { font-size:13px; line-height:1.55; color:var(--muted); margin-top:10px; }
-.hero img { aspect-ratio:1.13; object-fit:cover; }
+.hero img { object-fit:contain; }
 .hero figcaption { display:flex; justify-content:space-between; gap:20px; }
 .navigation { position:sticky; top:0; background:var(--paper); border-top:1px solid var(--line); border-bottom:1px solid var(--line); z-index:5; }
 .navigation .wrap { display:flex; gap:28px; overflow:auto; padding:14px 0; }
@@ -55,18 +55,7 @@ td:not(:first-child) { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; 
 .result-grid figcaption strong { display:block; font-weight:550; font-size:15px; color:var(--ink); margin-bottom:4px; }
 .offsets { display:block; font-size:12px; color:var(--muted); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
 .caption-note { display:block; margin-top:6px; }
-.experiment { margin-top:48px; }
-.experiment .columns { margin:24px 0 16px; }
-.experiment .columns img { max-height:480px; object-fit:contain; background:#e6e8e1; }
 .note { border-left:2px solid #8a9d8d; padding:6px 0 6px 20px; margin:24px 0; color:#4b5755; }
-.compare { margin:24px 0; }
-.compare-images { position:relative; overflow:hidden; background:#daddd2; }
-.compare-images .before { position:absolute; inset:0; height:100%; object-fit:cover; clip-path:inset(0 calc(100% - var(--split,50%)) 0 0); }
-.compare-images::after { content:""; position:absolute; left:var(--split,50%); top:0; bottom:0; border-left:2px solid white; pointer-events:none; }
-.compare-labels { display:flex; justify-content:space-between; gap:20px; font-size:12px; margin:8px 0; }
-.compare input { width:100%; accent-color:var(--accent); }
-.compare label { display:block; font-size:12px; color:var(--muted); }
-.print-comparison { display:none; }
 .small { font-size:13px; color:var(--muted); }
 .source-list { padding-left:20px; font-size:14px; }
 .source-list li { margin-bottom:8px; }
@@ -91,7 +80,7 @@ td:not(:first-child) { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; 
  html { scroll-behavior:auto; }
  body { background:white; color:#171d20; font-size:9pt; line-height:1.5; }
  .wrap { width:100%; }
- .skip,.navigation,.topbar,.compare,.screen-only { display:none!important; }
+ .skip,.navigation,.topbar { display:none!important; }
  .hero { padding:0 0 7mm; gap:8mm; grid-template-columns:.9fr 1.1fr; }
  h1 { font-size:31pt; margin:4mm 0; }
  h2 { font-size:22pt; margin:0 0 4mm; }
@@ -110,8 +99,6 @@ td:not(:first-child) { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; 
  .result-grid figcaption strong { font-size:9pt; }
  .offsets { font-size:7pt; }
  .caption-note { font-size:7pt; }
- .experiment { margin-top:7mm; }
- .experiment .columns img { max-height:70mm; }
  figure,.equation,.note,table,.strip { break-inside:avoid; }
  h2,h3 { break-after:avoid; }
  p { orphans:3; widows:3; margin-bottom:3mm; }
@@ -120,7 +107,6 @@ td:not(:first-child) { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; 
  table { font-size:8pt; }
  td:not(:first-child) { font-size:7pt; }
  th,td { padding:1.7mm 2mm 1.7mm 0; }
- .print-comparison { display:grid; }
  .source-list { font-size:8pt; }
  .footer { padding:5mm 0 0; font-size:7pt; }
  a { color:inherit; }
